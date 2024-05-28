@@ -116,7 +116,7 @@ class Block:
         self.check_outputs()
         self.runflag.set(True)
 
-class Config(Block):
+class BlockConfig(Block):
     def __init__(self, name: str, values: dict[str, any]) -> None:
         super().__init__(name, lambda: None)
         for k, v in values.items():

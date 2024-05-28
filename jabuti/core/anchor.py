@@ -1,7 +1,8 @@
 from typing import Any, TYPE_CHECKING
-if TYPE_CHECKING: from jabuti.core.link import Link
 
 from jabuti.core.const import TYPES_GROUP
+if TYPE_CHECKING:
+    from jabuti.core.link import Link
 
 
 
@@ -65,3 +66,7 @@ class Output(Anchor):
         self.status = True
         for link in self.links:
             link.propagate()
+    
+    def link_with(self, _input: Input) -> "Link":
+        from jabuti.core.link import Link
+        return Link(self, _input)

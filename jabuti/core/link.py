@@ -3,11 +3,10 @@ from jabuti.core.anchor import Input, Output
 
 
 class Link:
-    def __init__(self, name: str, output: Output, _input: Input) -> None:
+    def __init__(self, output: Output, _input: Input) -> None:
         assert isinstance(output, Output)
         assert isinstance(_input, Input)
         
-        self.name: str = name
         self.backref: Output = output
         self.nextref: Input = _input
         
@@ -22,10 +21,10 @@ class Link:
         nvt = self.nextref.vtype
         if (bvt is not None and nvt is not None
             and bvt != nvt and nvt != "sequence"):
-            print(f"Link '{self.name}' is bad: {bvt} -> {nvt}")
+            print(f"Link is bad: {bvt} -> {nvt}")
     
     def __repr__(self) -> str:
-        return f"<link> name:{self.name} conn:{self.backref.name}<>{self.nextref.name}"
+        return f"<link> conn:{self.backref.name}<>{self.nextref.name}"
     
     def get_value(self) -> any:
         return self.backref.value
