@@ -18,6 +18,7 @@ class TestConnection(unittest.TestCase):
         
         self.assertEqual(i1.value, 42)
 
+
 class TestBuiltins(unittest.TestCase):
     def test_sum(self):
         o1 = jb.Output("o1", int, 10)
@@ -49,6 +50,8 @@ class TestBuiltins(unittest.TestCase):
         del l3
         b1.run()
         self.assertEqual(b1["<sum"].value, 42.1)
+
+
 
 if __name__ == "__main__":
     unittest.main()
