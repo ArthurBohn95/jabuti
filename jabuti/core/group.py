@@ -16,4 +16,7 @@ class Group:
             self.status = status
         
         for block in self.blocks:
+            if block.enabler.links:
+                # Has an enabled connection, must not override
+                continue
             block.enabler.value = self.status
