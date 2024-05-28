@@ -5,8 +5,8 @@ import jabuti as jb
 
 class TestGrouping(unittest.TestCase):
     def test_status(self):
-        b1 = jb.builtin.BlockSum("sum")
-        b2 = jb.builtin.BlockInv("inv")
+        b1 = jb.builtin.BlockSum()
+        b2 = jb.builtin.BlockInv()
         
         g1 = jb.Group([b1, b2], True)
         g1.update(False)

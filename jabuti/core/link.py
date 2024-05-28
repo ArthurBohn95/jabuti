@@ -17,11 +17,13 @@ class Link:
         if self.backref.status:
             self.propagate()
         
+        self.healthy: bool = True
         bvt = self.backref.vtype
         nvt = self.nextref.vtype
         if (bvt is not None and nvt is not None
             and bvt != nvt and nvt != "sequence"):
-            print(f"Link is bad: {bvt} -> {nvt}")
+            self.healthy = False
+            # print(f"Link is bad: {bvt} -> {nvt}")
     
     def __repr__(self) -> str:
         return f"<link> conn:{self.backref.name}<>{self.nextref.name}"

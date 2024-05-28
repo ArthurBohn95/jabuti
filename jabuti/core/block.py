@@ -6,8 +6,8 @@ from jabuti.core.anchor import Input, Output
 
 
 class Block:
-    def __init__(self, name: str, function: Callable, inputs: list[Input] = None, outputs: list[Output] = None) -> None:
-        self.name: str = name
+    def __init__(self,function: Callable = None, inputs: list[Input] = None, outputs: list[Output] = None) -> None:
+        # self.name: str = name
         self.status: bool = False
         self.result: any = None
         self.function: Callable = function
@@ -26,7 +26,7 @@ class Block:
         self.runflag: Output = Output("status", bool, False)
     
     def __repr__(self) -> str:
-        return f"[block] name:{self.name} function:{self.function.__name__} status:{self.status} enabled:{self.enabler.value}"
+        return f"[block] function:{self.function.__name__} status:{self.status} enabled:{self.enabler.value}"
     
     def __getitem__(self, item: str) -> Input | Output:
         if len(item) < 2:
@@ -38,7 +38,7 @@ class Block:
         if io == '<':
             return self.outputs.get(name, None)
         
-        print(f"Anchor {name} does not exist")
+        # print(f"Anchor {name} does not exist")
     
     def reset(self) -> None:
         self.status = False
@@ -66,17 +66,17 @@ class Block:
         for _input in self.inputs.values():
             _input.check()
             if not _input.status:
-                print(f"Input '{_input.name}' is not ready")
+                # print(f"Input '{_input.name}' is not ready")
                 return False
         return True
     
     def check_outputs(self) -> None:
         if not self.status:
-            print(f"Block did not run")
+            # print(f"Block did not run")
             return
         
         if not len(self.outputs):
-            print(f"No outputs to set")
+            # print(f"No outputs to set")
             return
         
         # The result is simple: a scalar with only one output
@@ -96,39 +96,39 @@ class Block:
             return
         
         # The result is ordered: a tuple matching the outputs order # HELL NO
-        print(f"For some reason could not map the result to the outputs.")
+        # print(f"For some reason could not map the result to the outputs.")
     
     def run(self) -> None:
         self.enabler.check()
         if not self.enabler.value:
-            print(f"The block '{self.name}' is disabled")
+            # print(f"The block '{self.name}' is disabled")
+            return
+        
+        if self.function is None:
             return
         
         if not self.check_inputs():
-            print(f"Not all inputs are ready")
+            # print(f"Not all inputs are ready")
             return
         
-        params = {p.name: p.value for p in self.inputs.values()}
-        # print(f"{params=}")
+        params = {i.name: i.value for i in self.inputs.values()}
         self.result = self.function(**params)
-        # print(f"{self.result=}")
         self.status = True
         self.check_outputs()
         self.runflag.set(True)
 
 class BlockConfig(Block):
-    def __init__(self, name: str, values: dict[str, any]) -> None:
-        super().__init__(name, lambda: None)
+    def __init__(self, values: dict[str, any]) -> None:
+        super().__init__()
         for k, v in values.items():
-            # print(f"{k=} {type(v)=} {v=}")
             _output = Output(k, type(v))
             _output.set(v)
             self.outputs[k] = _output
         self.status: bool = True
 
 class AutoBlock(Block):
-    def __init__(self, name: str, function: Callable, outputs: dict[str, type] = None) -> None:
-        super().__init__(name, function)
+    def __init__(self, function: Callable, outputs: dict[str, type] = None) -> None:
+        super().__init__(function)
         
         for param in inspect.signature(function).parameters.values():
             name = param.name
