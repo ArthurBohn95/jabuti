@@ -1,7 +1,8 @@
 from typing import Any, TYPE_CHECKING
-if TYPE_CHECKING:
-    from jabuti.core.link import Link
+if TYPE_CHECKING: from jabuti.core.link import Link
+
 from jabuti.core.const import TYPES_GROUP
+
 
 
 class Anchor:

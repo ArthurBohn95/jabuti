@@ -1,6 +1,6 @@
-from typing import Any
-
 from jabuti.core.anchor import Input, Output
+
+
 
 class Link:
     def __init__(self, name: str, output: Output, _input: Input) -> None:
@@ -27,7 +27,7 @@ class Link:
     def __repr__(self) -> str:
         return f"<link> name:{self.name} conn:{self.backref.name}<>{self.nextref.name}"
     
-    def get_value(self) -> Any:
+    def get_value(self) -> any:
         return self.backref.value
     
     def get_status(self) -> bool:

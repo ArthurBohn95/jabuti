@@ -1,5 +1,7 @@
 from jabuti.core.block import AutoBlock
 
+
+
 class BlockSum(AutoBlock):
     def __init__(self, name: str) -> None:
         def func(nums: list):

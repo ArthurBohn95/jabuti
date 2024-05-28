@@ -1,5 +1,7 @@
-from jabuti.core.block import AutoBlock
 import pandas as pd
+from jabuti.core.block import AutoBlock
+
+
 
 class BlockUnion(AutoBlock):
     def __init__(self, name: str) -> None:

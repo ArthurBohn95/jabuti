@@ -1,13 +1,15 @@
 import inspect
-from typing import Any, Callable, Union
+from typing import Callable
 
 from jabuti.core.anchor import Input, Output
+
+
 
 class Block:
     def __init__(self, name: str, function: Callable, inputs: list[Input] = None, outputs: list[Output] = None) -> None:
         self.name: str = name
         self.status: bool = False
-        self.result: Any = None
+        self.result: any = None
         self.function: Callable = function
         
         self.inputs: dict[str, Input] = {}
@@ -26,7 +28,7 @@ class Block:
     def __repr__(self) -> str:
         return f"[block] name:{self.name} function:{self.function.__name__} status:{self.status} enabled:{self.enabler.value}"
     
-    def __getitem__(self, item: str) -> Union[Input, Output]:
+    def __getitem__(self, item: str) -> Input | Output:
         if len(item) < 2:
             return
         
@@ -115,7 +117,7 @@ class Block:
         self.runflag.set(True)
 
 class Config(Block):
-    def __init__(self, name: str, values: dict[str, Any]) -> None:
+    def __init__(self, name: str, values: dict[str, any]) -> None:
         super().__init__(name, lambda: None)
         for k, v in values.items():
             # print(f"{k=} {type(v)=} {v=}")
@@ -137,7 +139,7 @@ class AutoBlock(Block):
                 elif param.kind == inspect._ParameterKind.VAR_KEYWORD:
                     _type = dict
                 else:
-                    _type = Any
+                    _type = any
             self.inputs[name] = Input(name, _type)
         
         if outputs is not None:
