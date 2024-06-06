@@ -36,29 +36,29 @@ def calc_line_points(
     p1: tuple[int, int],
     orient: str,
     gap: float,
-    ) -> tuple[tuple[int, int], ...]:
+    ) -> tuple[int, ...]:
     # TODO: Improve line pathing
     match orient.lower():
         case "h":
             xdif = p1[0] - p0[0]
-            if xdif < 2 * GAP:
+            if xdif < 2 * gap:
                 return *p0, *p1
             pm0 = p0[0] + gap, p0[1]
             pm1 = p1[0] - gap, p1[1]
         
         case "v":
             ydif = p1[1] - p0[1]
-            if ydif < 2 * GAP:
+            if ydif < 2 * gap:
                 return *p0, *p1
-            pm0 = p0[0], p0[1] + GAP
-            pm1 = p1[0], p1[1] - GAP
+            pm0 = p0[0], p0[1] + gap
+            pm1 = p1[0], p1[1] - gap
         
         case _:
             return *p0, *p1
     
     return *p0, *pm0, *pm1, *p1
 
-def calc_link_shape(a0: "GUIAnchor", a1: "GUIAnchor") -> tuple[tuple[int, int], ...]:
+def calc_link_shape(a0: "GUIAnchor", a1: "GUIAnchor") -> tuple[int, ...]:
     return calc_line_points(a0.center(), a1.center(), a0.orient, GAP)
 
 
@@ -99,6 +99,13 @@ class GUILink(GUIObjBase):
     def update_shape(self) -> None:
         pts = calc_link_shape(self.anchors[0], self.anchors[1])
         self.canvas.coords(self.id, pts)
+
+class GUILabel(GUIObjBase):
+    def __init__(self, id: int, tag: str, canvas: tk.Canvas, anchor: "GUIAnchor", text: str) -> None:
+        super().__init__(id, tag, canvas)
+        self.text: str = text
+        self.anchor: "GUIAnchor" = anchor
+        self.can_grab = False
 
 class GUIAnchor(GUIObjBase):
     def __init__(self, id: int, tag: str, canvas: tk.Canvas, block: "GUIBlock", type: Literal["in", "out"], orient: Literal["h", "v"]) -> None:
@@ -264,6 +271,26 @@ class Board:
         
         return id, tag, obj
     
+    def _create_label(self, anchor: GUIAnchor, text: str) -> tuple[int, str, GUIAnchor]:
+        just, offset = {
+            ("in",  "h") : ("w", ( ASIZE*2, ASIZE )),
+            ("out", "h") : ("e", (       0, ASIZE )),
+            ("in",  "v") : ("n", ( ASIZE/2, ASIZE*1.5 )),
+            ("out", "v") : ("s", ( ASIZE/2, 0 )),
+        }.get((anchor.type, anchor.orient))
+        
+        pos = anchor.pos()
+        x = pos[0] + offset[0] * GAP
+        y = pos[1] + offset[1] * GAP
+        
+        tag = self._get_tag_count("label")
+        id = self.canvas.create_text(x, y, text=text, anchor=just, fill="#F0F0F0", font=("consolas", GAP//3), tags=(tag, anchor.tag, anchor.block.tag))
+        obj = GUILabel(id, tag, self.canvas, anchor, tag)
+        
+        self.idmgr.reg(id, tag, obj)
+        
+        return id, tag, obj
+    
     def _create_anchor(self, block: GUIBlock, pos: tuple[int, int], ofs: tuple[int, int], type: str, orient: str) -> tuple[int, str, GUIAnchor]:
         x, y = pos[0] + ofs[0], pos[1] + ofs[1]
         x0 = (x - ASIZE) * GAP
@@ -283,6 +310,9 @@ class Board:
         obj = GUIAnchor(id, tag, self.canvas, block, type, orient)
         self.idmgr.reg(id, tag, obj)
         self.canvas.tag_bind(id, "<ButtonPress-1>", self.on_create_link)
+        
+        if orient == "h" or True:
+            _ = self._create_label(obj, tag)
         
         return id, tag, obj
     
@@ -329,19 +359,30 @@ class Board:
     
     
     # region events
-    def on_block_press(self, event: tk.Event) -> None:
-        id = self.canvas.find_closest(event.x, event.y)[0]
-        if id not in self.idmgr:
-            self.clear_drag()
-            return
+    def __find_block(self, event: tk.Event) -> tuple[int, str, GUIObject]:
+        empty = (None, None, None)
         
-        tag, obj = self.idmgr[id]
-        if not obj.can_grab:
+        prev = None
+        for _ in range(3):
+            id = self.canvas.find_closest(event.x, event.y, halo=0, start=prev)[0]
+            if id not in self.idmgr:
+                return empty
+            
+            tag, obj = self.idmgr[id]
+            if obj.can_grab:
+                return id, tag, obj
+            
+            prev = tag
+        
+        return empty
+    
+    def on_block_press(self, event: tk.Event) -> None:
+        id, tag, obj = self.__find_block(event)
+        if id is None:
             self.clear_drag()
             return
         
         self.drag_data = {"id": id, "tag": tag, "obj": obj, "event": event}
-        # print(f"{self.drag_data = }")
     
     def on_block_motion(self, event: tk.Event) -> None:
         if self.drag_data["id"] is None:
@@ -357,7 +398,6 @@ class Board:
         if self.drag_data["id"] is None:
             return
         
-        # print(f"{self.canvas.coords(self.drag_data['id'])=}")
         x, y, *_ = self.canvas.coords(self.drag_data["id"])
         self.place_tag_snap(self.drag_data["tag"], x, y)
         self.drag_data["obj"].update_shape()
