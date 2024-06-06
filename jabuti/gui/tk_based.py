@@ -10,25 +10,29 @@ ASIZE = GAP / 4 / GAP # anchor radius in GAPs, don't ask me how it works, it jus
 WIDTH = 48 * GAP
 HEIGHT = 32 * GAP
 BGCOLOR = "#202020"
+GRIDCOLOR = "#424242"
 
 def snap(num: float, base: float) -> float:
     return base * round(num/base)
 
 def calc_block_sizes(ins: int, outs: int) -> int:
-    dpos = {
-        0: [],
-        1: [2],
-        2: [1, 3],
-        3: [1, 2, 3],
-    }
+    # TODO: improve for sizes different than 4
+    # dpos = {
+    #     0: [],
+    #     1: [2],
+    #     2: [1, 3],
+    #     3: [1, 2, 3],
+    # }
     size = max(BSIZE, max(ins, outs) + 1)
     
-    if size == BSIZE: # default size
-        ipos = dpos.get(ins)
-        opos = dpos.get(outs)
-    else:
-        ipos = list(range(1, ins + 1))
-        opos = list(range(1, outs + 1))
+    # if max(ins, outs) in dpos:
+    #     ipos = dpos.get(ins)
+    #     opos = dpos.get(outs)
+    
+    # else:
+    ipos = list(range(1, ins + 1))
+    opos = list(range(1, outs + 1))
+    
     return size, ipos, opos
 
 def calc_line_points(
@@ -106,18 +110,24 @@ class GUILabel(GUIObjBase):
         self.text: str = text
         self.anchor: "GUIAnchor" = anchor
         self.can_grab = False
+    
+    def rmv(self) -> None:
+        self.anchor = None
 
 class GUIAnchor(GUIObjBase):
     def __init__(self, id: int, tag: str, canvas: tk.Canvas, block: "GUIBlock", type: Literal["in", "out"], orient: Literal["h", "v"]) -> None:
         super().__init__(id, tag, canvas)
         self.type: str = type
         self.block: "GUIBlock" = block
-        self.links: dict[int, GUILink] = {}
+        self.label: "GUILabel" = None
+        self.links: dict[int, "GUILink"] = {}
         self.orient: str = orient
     
     def rmv(self) -> None:
         # for link in self.links.values():
         #     link.rmv()
+        self.label.rmv()
+        self.label = None
         self.block = None
         self.links = None
 
@@ -144,12 +154,20 @@ class GUIBlock(GUIObjBase):
         links.extend(self.runflag.links.values())
         return links
     
+    def get_labels(self) -> list[GUILabel]:
+        labels = []
+        for anchor in self.anchors.values():
+            labels.append(anchor.label)
+        labels.extend([self.enabler.label, self.runflag.label])
+        return labels
+    
     def get_all_ids(self) -> list[int]:
         ids = []
         ids.extend(list(self.anchors.keys()))
         ids.append(self.enabler.id)
         ids.append(self.runflag.id)
         ids.extend([link.id for link in self.get_links()])
+        ids.extend([label.id for label in self.get_labels()])
         return ids
     
     def update_shape(self) -> None:
@@ -213,9 +231,9 @@ class Board:
     
     def __create_grid(self) -> None:
         for y in range(0, HEIGHT, GAP):
-            self.canvas.create_line((0, y, WIDTH, y), dash=(1, 5), fill="#D0D0D0", tags=("grid", "background"))
+            self.canvas.create_line((0, y, WIDTH, y), dash=(1, 5), fill=GRIDCOLOR, tags=("grid", "background"))
         for x in range(0, WIDTH, GAP):
-            self.canvas.create_line((x, 0, x, HEIGHT), dash=(1, 5), fill="#D0D0D0", tags=("grid", "background"))
+            self.canvas.create_line((x, 0, x, HEIGHT), dash=(1, 5), fill=GRIDCOLOR, tags=("grid", "background"))
         self.canvas.pack()
     
     def _get_tag_count(self, tag: str) -> int:
@@ -252,7 +270,7 @@ class Board:
         if a1.type == "out": # Output -> Input, otherwise inverts them
             a0, a1 = a1, a0
         
-        pts = calc_line_points(a0.center(), a1.center(), a0.orient, GAP)
+        pts = calc_link_shape(a0, a1)
         tag = self._get_tag_count("link")
         params = dict(width=2, fill="#E3E3E3", arrow="last")
         if a0.orient == "v":
@@ -284,7 +302,11 @@ class Board:
         y = pos[1] + offset[1] * GAP
         
         tag = self._get_tag_count("label")
-        id = self.canvas.create_text(x, y, text=text, anchor=just, fill="#F0F0F0", font=("consolas", GAP//3), tags=(tag, anchor.tag, anchor.block.tag))
+        id = self.canvas.create_text(
+            x, y, text=text, anchor=just,
+            fill="#F0F0F0", font=("consolas", GAP//3),
+            tags=(tag, anchor.tag, anchor.block.tag)
+        )
         obj = GUILabel(id, tag, self.canvas, anchor, tag)
         
         self.idmgr.reg(id, tag, obj)
@@ -311,14 +333,15 @@ class Board:
         self.idmgr.reg(id, tag, obj)
         self.canvas.tag_bind(id, "<ButtonPress-1>", self.on_create_link)
         
-        if orient == "h" or True:
-            _ = self._create_label(obj, tag)
+        _, _, lobj = self._create_label(obj, tag)
+        print(f"label object {lobj = }")
+        obj.label = lobj
         
         return id, tag, obj
     
     def _create_block(self, pos: tuple[float, float]) -> tuple[int, str, GUIBlock]:
-        ins = random.randint(1, 5)
-        outs = random.randint(1, 5)
+        ins = random.randint(1, 2)
+        outs = random.randint(1, 2)
         size, ipos, opos = calc_block_sizes(ins, outs)
         color = f"#{random.randint(0, 0xFFFFFF):06x}"
         
@@ -405,19 +428,28 @@ class Board:
     
     
     def on_remove(self, event: tk.Event) -> None:
-        id = self.canvas.find_closest(event.x, event.y)[0]
-        if not id in self.idmgr:
-            return
+        id, tag, obj = None, None, None
+        prev = None
+        for _ in range(5):
+            id = self.canvas.find_closest(event.x, event.y, halo=0, start=prev)[0]
+            if id not in self.idmgr:
+                continue
+            
+            tag, obj = self.idmgr[id]
+            if tag.startswith("block") or tag.startswith("link"):
+                break
+            
+            prev = tag
         
-        tag, obj = self.idmgr[id]
-        
-        if not tag.startswith("block") and not tag.startswith("link"):
+        if id is None:
             return
         
         self.idmgr.rmv(id)
         self.canvas.delete(tag)
         
+        print(f"del {tag=}")
         if tag.startswith("block"):
+            print(f"{obj.get_all_ids() = }")
             for id in obj.get_all_ids():
                 self.idmgr.rmv(id)
                 self.canvas.delete(id)
@@ -433,7 +465,7 @@ class Board:
         if event.state & 0x4:
             return
         
-        id = self.canvas.find_closest(event.x, event.y)[0]
+        id = self.canvas.find_closest(event.x, event.y, halo=ASIZE)[0]
         if not id in self.idmgr:
             return
         
@@ -454,7 +486,7 @@ class Board:
     # region debuggers
     def dbg_print_all(self, event: tk.Event) -> None:
         print(f"{self.idmgr.id2tag = }")
-        print(f"{self.idmgr.id2obj = }")
+        # print(f"{self.idmgr.id2obj = }")
         print(f"{self.canvas.find_all() = }")
     
     def dbg_block_links(self, event: tk.Event) -> None:
