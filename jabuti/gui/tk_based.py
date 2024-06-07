@@ -9,6 +9,9 @@ BSIZE = 4             # block size in GAPs
 ASIZE = GAP / 4 / GAP # anchor radius in GAPs, don't ask me how it works, it just works
 WIDTH = 48 * GAP
 HEIGHT = 32 * GAP
+FONT1 = ("consolas", int(GAP/2.5))
+FONT2 = ("consolas", int(GAP/3.0))
+
 BGCOLOR = "#202020"
 GRIDCOLOR = "#424242"
 
@@ -208,6 +211,37 @@ class IDManager:
 
 
 
+# region PopMenu
+# source: https://stackoverflow.com/questions/12014210/tkinter-app-adding-a-right-click-context-menu
+class PopMenu(tk.Menu):
+    def __init__(self, parent: tk.Canvas) -> None:
+        super().__init__(parent, tearoff=0)
+        self.submenus: dict[str, tk.Menu] = {}
+    
+    def handle_selection(self, value) -> None:
+        print(f"{value = }")
+    
+    def show(self, event: tk.Event) -> None:
+        self.post(event.x_root, event.y_root)
+    
+    def add_submenu(self, name: str, options: list[str]) -> None:
+        # https://stackoverflow.com/questions/74907864/using-the-menu-add-command-function-in-a-for-loop-only-uses-the-last-iterable
+        
+        submenu = tk.Menu(self, tearoff=0)
+        for option in options:
+            label = f"{name}/{option}"
+            submenu.add_command(label=option, font=FONT2,
+                command=lambda label=label: self.handle_selection(value=label))
+        
+        self.add_cascade(label=name, menu=submenu, font=FONT1)
+        self.submenus[name] = submenu
+    
+    def add_submenus(self, data: dict[str, list[str]]) -> None:
+        for name, options in data.items():
+            self.add_submenu(name, options)
+
+
+
 # region Board
 default_drag_data = {"id": None, "tag": None, "obj": None, "event": None}
 class Board:
@@ -220,6 +254,18 @@ class Board:
         
         self.drag_data: dict[str, int | str | GUIObject | tk.Event] = default_drag_data
         self.link_data: list[GUIAnchor] = []
+        
+        self.pop_menu: PopMenu = PopMenu(self.canvas)
+        self.pop_menu.add_submenus({
+            "math": ["add", "sub", "mult", "div", "inv", "abs", "pow", "sqrt", "min", "max", "avg", "sum"],
+            "text": ["format", "replace", "concat"],
+            "json": ["load", "dump"],
+            "table": ["read_csv", "write_csv", "left_join", "union"],
+            "API": ["request", "get", "post"],
+            "SQL": ["SELECT", "DELETE", "UPDATE", "DROP"],
+        })
+        self.canvas.bind("<Button-3>", self.pop_menu.show)
+        self.canvas.bind("<Button-1>", lambda event: self.pop_menu.unpost())
         
         self.__create_grid()
         
@@ -304,7 +350,7 @@ class Board:
         tag = self._get_tag_count("label")
         id = self.canvas.create_text(
             x, y, text=text, anchor=just,
-            fill="#F0F0F0", font=("consolas", GAP//3),
+            fill="#F0F0F0", font=FONT2,
             tags=(tag, anchor.tag, anchor.block.tag)
         )
         obj = GUILabel(id, tag, self.canvas, anchor, tag)
