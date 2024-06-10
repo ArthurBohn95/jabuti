@@ -50,6 +50,22 @@ class TestBuiltins(unittest.TestCase):
         del l3
         b1.run()
         self.assertEqual(b1["<sum"].value, 42.1)
+    
+    def test_flag(self):
+        c1 = jb.BlockConfig({"x": 10, "y": 32, "z": 42})
+        b1 = jb.builtin.Cmp()
+        l1 = c1["<x"].link_with(b1[">x"])
+        l2 = c1["<y"].link_with(b1[">y"])
+        b1.run()
+        
+        self.assertTrue(b1['<neq'].value)
+        
+        b2 = jb.builtin.Abs()
+        l3 = b1["<neq"].link_with(b2.enabler)
+        l4 = c1["<z"].link_with(b2[">num"])
+        b2.run()
+        
+        self.assertEqual(b2['<neg'].value, -42)
 
 
 

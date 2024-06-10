@@ -6,7 +6,7 @@ from jabuti.core.anchor import Input, Output
 
 
 class Block:
-    def __init__(self,function: Callable = None, inputs: list[Input] = None, outputs: list[Output] = None) -> None:
+    def __init__(self, function: Callable = None, inputs: list[Input] = None, outputs: list[Output] = None) -> None:
         # self.name: str = name
         self.status: bool = False
         self.result: any = None
@@ -22,8 +22,8 @@ class Block:
             self.register_outputs(outputs)
         
         # Creates the specific flow controlling IOs
-        self.enabler: Input = Input("enable", bool, True)
-        self.runflag: Output = Output("status", bool, False)
+        self.enabler: Input = Input("enabler", bool, True, "flag")
+        self.runflag: Output = Output("runflag", bool, False, "flag")
     
     def __repr__(self) -> str:
         return f"[block] function:{self.function.__name__} status:{self.status} enabled:{self.enabler.value}"
@@ -38,7 +38,7 @@ class Block:
         if io == '<':
             return self.outputs.get(name, None)
         
-        # print(f"Anchor {name} does not exist")
+        print(f"Anchor {name} does not exist")
     
     def reset(self) -> None:
         self.status = False
@@ -53,19 +53,19 @@ class Block:
         return self.check_inputs() and self.enabler
     
     def register_inputs(self, inputs: list[Input]) -> None:
-        for _input in inputs:
+        for input in inputs:
             # print(f"Block '{self.name}' registered Input '{_input.name}'")
-            self.inputs[_input.name] = _input
+            self.inputs[input.name] = input
     
     def register_outputs(self, outputs: list[Output]) -> None:
-        for _output in outputs:
+        for output in outputs:
             # print(f"Block '{self.name}' registered Output '{_output.name}'")
-            self.outputs[_output.name] = _output
+            self.outputs[output.name] = output
     
     def check_inputs(self) -> None:
-        for _input in self.inputs.values():
-            _input.check()
-            if not _input.status:
+        for input in self.inputs.values():
+            input.check()
+            if not input.status:
                 # print(f"Input '{_input.name}' is not ready")
                 return False
         return True
@@ -96,7 +96,12 @@ class Block:
             return
         
         # The result is ordered: a tuple matching the outputs order # HELL NO
-        # print(f"For some reason could not map the result to the outputs.")
+        if isinstance(self.result, (tuple)):
+            for value, output in zip(self.result, self.outputs.values()):
+                output.set(value)
+            return
+        
+        print(f"For some reason could not map the result to the outputs.")
     
     def run(self) -> None:
         self.enabler.check()
@@ -118,6 +123,7 @@ class Block:
         self.runflag.set(True)
 
 class BlockConfig(Block):
+    """Special block that only has outputs"""
     def __init__(self, values: dict[str, any]) -> None:
         super().__init__()
         for k, v in values.items():
@@ -125,9 +131,14 @@ class BlockConfig(Block):
             _output.set(v)
             self.outputs[k] = _output
         self.status: bool = True
+    
+    def __repr__(self) -> str:
+        vals = ', '.join(self.outputs.keys())
+        return f"[block] status:{self.status} enabled:{self.enabler.value} values:{vals}"
 
 class AutoBlock(Block):
-    def __init__(self, function: Callable, outputs: dict[str, type] = None) -> None:
+    """Uses the inspect.signature to fill out necessary parameters."""
+    def __init__(self, function: Callable, outputs: dict[str, type] | list[str] = None, flag: bool = False) -> None:
         super().__init__(function)
         
         for param in inspect.signature(function).parameters.values():
@@ -143,5 +154,9 @@ class AutoBlock(Block):
             self.inputs[name] = Input(name, _type)
         
         if outputs is not None:
-            for name, _type in outputs.items():
-                self.outputs[name] = Output(name, _type)
+            if flag:
+                for name in outputs:
+                    self.outputs[name] = Output(name, bool, False, "flag")
+            else:
+                for name, _type in outputs.items():
+                    self.outputs[name] = Output(name, _type, vtype="value")

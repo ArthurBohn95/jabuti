@@ -1,16 +1,15 @@
-from typing import Any, TYPE_CHECKING
-
-from jabuti.core.const import TYPES_GROUP
+from typing import Any, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     from jabuti.core.link import Link
+# from jabuti.core.const import TYPES_GROUP
 
 
 
 class Anchor:
-    def __init__(self, name: str, _type: type, value: Any = None) -> None:
+    def __init__(self, name: str, _type: type, value: Any = None, vtype: Literal["value", "flag"] = "value") -> None:
         self.name: str = name
         self.type: type = _type
-        self.vtype: str = TYPES_GROUP.get(_type.__name__, None)
+        self.vtype: str = vtype
         self.value: Any = value
         self.links: list["Link"] = []
         self.status: bool = False
@@ -19,7 +18,7 @@ class Anchor:
             self.status = True
     
     def __repr__(self) -> str:
-        return f"(anchor) name:{self.name} type:{self.vtype} value:{self.value} status:{self.status} links:{self.links}"
+        return f"(anchor) name:{self.name} type:{self.vtype}({self.type.__name__}) value:{self.value} status:{self.status} links:{self.links}"
     
     def reset(self) -> None:
         self.value = None
@@ -57,6 +56,9 @@ class Input(Anchor):
                     value = [value]
                 values.extend(value)
             self.value = values
+            
+            if self.vtype == "flag":
+                self.value = all(self.value)
         
         self.status = True
 

@@ -20,13 +20,12 @@ class Link:
         self.healthy: bool = True
         bvt = self.backref.vtype
         nvt = self.nextref.vtype
-        if (bvt is not None and nvt is not None
-            and bvt != nvt and nvt != "sequence"):
+        if bvt is not None and nvt is not None and bvt != nvt:
             self.healthy = False
             # print(f"Link is bad: {bvt} -> {nvt}")
     
     def __repr__(self) -> str:
-        return f"<link> conn:{self.backref.name}<>{self.nextref.name}"
+        return f"<link> conn:{self.backref.name}-->{self.nextref.name}"
     
     def get_value(self) -> any:
         return self.backref.value

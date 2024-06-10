@@ -1,22 +1,49 @@
 import random
 import tkinter as tk
+import tkinter.font as tkfont
 from typing import Literal
 
 
 # region consts and utils
-GAP = 24              # [10, 16, 24, 32, 40]
+GAP = 24              # [12, 16, 24, 32, 40]
 BSIZE = 4             # block size in GAPs
 ASIZE = GAP / 4 / GAP # anchor radius in GAPs, don't ask me how it works, it just works
-WIDTH = 48 * GAP
+WIDTH = 56 * GAP
 HEIGHT = 32 * GAP
 FONT1 = ("consolas", int(GAP/2.5))
 FONT2 = ("consolas", int(GAP/3.0))
 
-BGCOLOR = "#202020"
-GRIDCOLOR = "#424242"
+#print(f"{FONT1 = }")
+#print(f"{FONT2 = }")
+
+BG_COLOR = "#202020"
+GRID_COLOR = "#424242"
+LINK_COLOR = "#D0D0D0"
+LABEL_COLOR = "#F0F0F0"
+ANCHOR_COLOR = "#10A010"
+
+
 
 def snap(num: float, base: float) -> float:
     return base * round(num/base)
+
+def get_curr_screen_geometry():
+    """
+    Workaround to get the size of the current screen in a multi-screen setup.
+    
+    Returns:
+        geometry (str): The standard Tk geometry string.
+            [width]x[height]+[left]+[top]
+    
+    https://stackoverflow.com/a/56913005
+    """
+    root = tk.Tk()
+    root.update_idletasks()
+    root.attributes('-fullscreen', True)
+    root.state('iconic')
+    geometry = root.winfo_geometry()
+    root.destroy()
+    return geometry
 
 def calc_block_sizes(ins: int, outs: int) -> int:
     # TODO: improve for sizes different than 4
@@ -26,7 +53,8 @@ def calc_block_sizes(ins: int, outs: int) -> int:
     #     2: [1, 3],
     #     3: [1, 2, 3],
     # }
-    size = max(BSIZE, max(ins, outs) + 1)
+    # size = max(BSIZE, max(ins, outs) + 1) # ensures minimum size of BSIZE
+    size = max(ins, outs) + 1 # ensures perfect anchors
     
     # if max(ins, outs) in dpos:
     #     ipos = dpos.get(ins)
@@ -45,28 +73,32 @@ def calc_line_points(
     gap: float,
     ) -> tuple[int, ...]:
     # TODO: Improve line pathing
+    mid = []
     match orient.lower():
-        case "h":
+        case "h-h":
             xdif = p1[0] - p0[0]
-            if xdif < 2 * gap:
-                return *p0, *p1
-            pm0 = p0[0] + gap, p0[1]
-            pm1 = p1[0] - gap, p1[1]
+            if xdif >= 2 * gap:
+                mid = [
+                    p0[0] + gap, p0[1],
+                    p1[0] - gap, p1[1],
+                ]
         
-        case "v":
+        case "v-v":
             ydif = p1[1] - p0[1]
-            if ydif < 2 * gap:
-                return *p0, *p1
-            pm0 = p0[0], p0[1] + gap
-            pm1 = p1[0], p1[1] - gap
+            if ydif > 2 * gap:
+                mid = [
+                    p0[0], p0[1] + gap,
+                    p1[0], p1[1] - gap,
+                ]
         
-        case _:
-            return *p0, *p1
+        case "h-v":
+            pass
     
-    return *p0, *pm0, *pm1, *p1
+    return *p0, *mid, *p1
 
 def calc_link_shape(a0: "GUIAnchor", a1: "GUIAnchor") -> tuple[int, ...]:
-    return calc_line_points(a0.center(), a1.center(), a0.orient, GAP)
+    orient = f"{a0.orient}-{a1.orient}"
+    return calc_line_points(a0.center(), a1.center(), orient, GAP)
 
 
 
@@ -92,6 +124,9 @@ class GUIObjBase:
         cx = (pos[0] + pos[2]) / 2
         cy = (pos[1] + pos[3]) / 2
         return cx, cy
+    
+    def update_shape(self) -> None:
+        pass
 
 class GUILink(GUIObjBase):
     def __init__(self, id: int, tag: str, canvas: tk.Canvas) -> None:
@@ -108,14 +143,14 @@ class GUILink(GUIObjBase):
         self.canvas.coords(self.id, pts)
 
 class GUILabel(GUIObjBase):
-    def __init__(self, id: int, tag: str, canvas: tk.Canvas, anchor: "GUIAnchor", text: str) -> None:
+    def __init__(self, id: int, tag: str, canvas: tk.Canvas, parent: "GUIObject", text: str) -> None:
         super().__init__(id, tag, canvas)
         self.text: str = text
-        self.anchor: "GUIAnchor" = anchor
+        self.parent: "GUIObject" = parent
         self.can_grab = False
     
     def rmv(self) -> None:
-        self.anchor = None
+        self.parent = None
 
 class GUIAnchor(GUIObjBase):
     def __init__(self, id: int, tag: str, canvas: tk.Canvas, block: "GUIBlock", type: Literal["in", "out"], orient: Literal["h", "v"]) -> None:
@@ -138,11 +173,14 @@ class GUIBlock(GUIObjBase):
     def __init__(self, id: int, tag: str, canvas: tk.Canvas) -> None:
         super().__init__(id, tag, canvas)
         self.can_grab = True
+        self.label: "GUILabel" = None
         self.anchors: dict[int, GUIAnchor] = {}
         self.enabler: GUIAnchor = None
         self.runflag: GUIAnchor = None
     
     def rmv(self):
+        self.label.rmv()
+        self.label = None
         for link in self.get_links():
             link.rmv()
         for anchor in self.anchors.values():
@@ -155,23 +193,23 @@ class GUIBlock(GUIObjBase):
             links.extend(anchor.links.values())
         links.extend(self.enabler.links.values())
         links.extend(self.runflag.links.values())
-        return links
+        return [l for l in links if l is not None]
     
     def get_labels(self) -> list[GUILabel]:
-        labels = []
+        labels = [self.label]
         for anchor in self.anchors.values():
             labels.append(anchor.label)
         labels.extend([self.enabler.label, self.runflag.label])
-        return labels
+        return [l for l in labels if l is not None]
     
     def get_all_ids(self) -> list[int]:
-        ids = []
+        ids = [self.label.id]
         ids.extend(list(self.anchors.keys()))
         ids.append(self.enabler.id)
         ids.append(self.runflag.id)
         ids.extend([link.id for link in self.get_links()])
         ids.extend([label.id for label in self.get_labels()])
-        return ids
+        return set(ids)
     
     def update_shape(self) -> None:
         for link in self.get_links():
@@ -247,7 +285,7 @@ default_drag_data = {"id": None, "tag": None, "obj": None, "event": None}
 class Board:
     def __init__(self, master):
         self.master: tk.Tk = master
-        self.canvas: tk.Canvas = tk.Canvas(master, width=WIDTH, height=HEIGHT, bg=BGCOLOR)
+        self.canvas: tk.Canvas = tk.Canvas(master, width=WIDTH, height=HEIGHT, bg=BG_COLOR)
         self.idmgr: IDManager = IDManager()
         
         self.tag_counts: dict[str, int] = {}
@@ -277,9 +315,9 @@ class Board:
     
     def __create_grid(self) -> None:
         for y in range(0, HEIGHT, GAP):
-            self.canvas.create_line((0, y, WIDTH, y), dash=(1, 5), fill=GRIDCOLOR, tags=("grid", "background"))
+            self.canvas.create_line((0, y, WIDTH, y), dash=(1, 5), fill=GRID_COLOR, tags=("grid", "background"))
         for x in range(0, WIDTH, GAP):
-            self.canvas.create_line((x, 0, x, HEIGHT), dash=(1, 5), fill=GRIDCOLOR, tags=("grid", "background"))
+            self.canvas.create_line((x, 0, x, HEIGHT), dash=(1, 5), fill=GRID_COLOR, tags=("grid", "background"))
         self.canvas.pack()
     
     def _get_tag_count(self, tag: str) -> int:
@@ -318,7 +356,7 @@ class Board:
         
         pts = calc_link_shape(a0, a1)
         tag = self._get_tag_count("link")
-        params = dict(width=2, fill="#E3E3E3", arrow="last")
+        params = dict(width=2.5, fill=LINK_COLOR, arrow="last")
         if a0.orient == "v":
             params["dash"] = (1, 5)
             params["width"] = 3
@@ -335,26 +373,45 @@ class Board:
         
         return id, tag, obj
     
-    def _create_label(self, anchor: GUIAnchor, text: str) -> tuple[int, str, GUIAnchor]:
-        just, offset = {
-            ("in",  "h") : ("w", ( ASIZE*2, ASIZE )),
-            ("out", "h") : ("e", (       0, ASIZE )),
-            ("in",  "v") : ("n", ( ASIZE/2, ASIZE*1.5 )),
-            ("out", "v") : ("s", ( ASIZE/2, 0 )),
-        }.get((anchor.type, anchor.orient))
+    def _create_label(self, parent: GUIAnchor | GUIBlock, text: str) -> tuple[int, str, GUIAnchor]:
+        tags = [parent.tag]
+        if isinstance(parent, GUIAnchor):
+            just, offset = {
+                ("in",  "h") : ("w", (  ASIZE*2.5, ASIZE )),
+                ("out", "h") : ("e", ( -ASIZE/2,   ASIZE )),
+                ("in",  "v") : ("n", (  ASIZE/2,   ASIZE*1.5 )), # DNU
+                ("out", "v") : ("s", (  ASIZE/2,   0 )),         # DNU
+            }.get((parent.type, parent.orient))
+            
+            pos = parent.pos()
+            x = pos[0] + offset[0] * GAP
+            y = pos[1] + offset[1] * GAP
+            tags.append(parent.block.tag)
         
-        pos = anchor.pos()
-        x = pos[0] + offset[0] * GAP
-        y = pos[1] + offset[1] * GAP
+        elif isinstance(parent, GUIBlock):
+            just = "n"
+            # pos = parent.pos()
+            # x = (pos[0] + pos[2]) / 2
+            # y = pos[1] + FONT2[1] * 1.5
+            text = f"text\n{text}"
+            x, y = parent.center()
+            font = tkfont.Font(font=FONT2)
+            h = font.metrics("linespace")
+            print(f"{h=}")
+            y -= len(text.split('\n') * h) / 2
+        
+        else:
+            return
         
         tag = self._get_tag_count("label")
+        tags.append(tag)
         id = self.canvas.create_text(
-            x, y, text=text, anchor=just,
-            fill="#F0F0F0", font=FONT2,
-            tags=(tag, anchor.tag, anchor.block.tag)
+            x, y, justify="center",
+            text=text, anchor=just,
+            fill=LABEL_COLOR, font=FONT2,
+            tags=tags
         )
-        obj = GUILabel(id, tag, self.canvas, anchor, tag)
-        
+        obj = GUILabel(id, tag, self.canvas, parent, tag)
         self.idmgr.reg(id, tag, obj)
         
         return id, tag, obj
@@ -369,9 +426,9 @@ class Board:
         tag = self._get_tag_count("anchor")
         match orient:
             case "h":
-                id = self.canvas.create_oval(x0, y0, x1, y1, fill="#10A010", tags=("anchor", tag, block.tag))
+                id = self.canvas.create_oval(x0-1, y0-1, x1+1, y1+1, fill=ANCHOR_COLOR, tags=("anchor", tag, block.tag))
             case "v":
-                id = self.canvas.create_rectangle(x0+1, y0+1, x1-1, y1-1, fill="#10A010", tags=("anchor", tag, block.tag))
+                id = self.canvas.create_rectangle(x0, y0, x1, y1, fill=ANCHOR_COLOR, tags=("anchor", tag, block.tag))
             case _:
                 return
         
@@ -379,17 +436,18 @@ class Board:
         self.idmgr.reg(id, tag, obj)
         self.canvas.tag_bind(id, "<ButtonPress-1>", self.on_create_link)
         
-        _, _, lobj = self._create_label(obj, tag)
-        print(f"label object {lobj = }")
-        obj.label = lobj
+        if orient == "h":
+            _, _, lobj = self._create_label(obj, tag[6:])
+            # print(f"label object {lobj = }")
+            obj.label = lobj
         
         return id, tag, obj
     
     def _create_block(self, pos: tuple[float, float]) -> tuple[int, str, GUIBlock]:
-        ins = random.randint(1, 2)
-        outs = random.randint(1, 2)
+        ins = random.randint(1, 4)
+        outs = random.randint(1, 4)
         size, ipos, opos = calc_block_sizes(ins, outs)
-        color = f"#{random.randint(0, 0xFFFFFF):06x}"
+        color = f"#{random.randint(32, 196):02x}{random.randint(32, 196):02x}{random.randint(32, 196):02x}"
         
         # Position calculation
         x0 = pos[0]     * GAP
@@ -419,7 +477,10 @@ class Board:
         _, _, a_obj = self._create_anchor(obj, pos, (BSIZE//2, size), "out", "v")
         obj.runflag = a_obj
         
-        # self.canvas.tag_bind(tag, "<ButtonPress-1>", self.dbg_block_links)
+        _, _, lobj = self._create_label(obj, tag)
+        # print(f"label object {lobj = }")
+        obj.label = lobj
+        
         self.canvas.tag_bind(tag, "<ButtonPress-1>",   self.on_block_press)
         self.canvas.tag_bind(tag, "<B1-Motion>",       self.on_block_motion)
         self.canvas.tag_bind(tag, "<ButtonRelease-1>", self.on_block_release)
@@ -493,9 +554,9 @@ class Board:
         self.idmgr.rmv(id)
         self.canvas.delete(tag)
         
-        print(f"del {tag=}")
+        # print(f"del {tag=}")
         if tag.startswith("block"):
-            print(f"{obj.get_all_ids() = }")
+            # print(f"{obj.get_all_ids() = }")
             for id in obj.get_all_ids():
                 self.idmgr.rmv(id)
                 self.canvas.delete(id)
@@ -552,6 +613,18 @@ class Board:
 
 # region main
 if __name__ == "__main__":
+    # print(f"{get_curr_screen_geometry() = }")
+    
     root = tk.Tk()
     app = Board(root)
+    root.wm_state('zoomed')
+    
+    # print(f"{root.winfo_height()      =: 4} {root.winfo_width()        =: 4}")
+    # print(f"{root.winfo_reqheight()   =: 4} {root.winfo_reqwidth()     =: 4}")
+    # print(f"{root.winfo_screenwidth() =: 4} {root.winfo_screenheight() =: 4}")
+    
+    # root.focus_set()
+    # root.attributes("-topmost", True)
+    # root.wm_attributes('-zoomed', True)
+    # root.attributes('-fullscreen', True)
     root.mainloop()
