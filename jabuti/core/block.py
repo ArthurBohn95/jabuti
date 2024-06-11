@@ -1,7 +1,7 @@
 import inspect
 from typing import Callable
 
-from jabuti.core.anchor import Input, Output
+from jabuti.core.anchor import Anchor, Input, Output
 
 
 
@@ -39,6 +39,21 @@ class Block:
             return self.outputs.get(name, None)
         
         print(f"Anchor {name} does not exist")
+    
+    def _size(self) -> int:
+        return max(len(self.inputs), len(self.outputs))
+    
+    def _export_anchors(self) -> list[tuple[Anchor, str, str, tuple]]:
+        ainfo = []
+        for y, input in enumerate(self.inputs.values()):
+            ainfo.append((input, "in", "h", (0, y+1)))
+        for y, output in enumerate(self.outputs.values()):
+            ainfo.append((output, "out", "h", (1, y+1)))
+        if self.enabler is not None:
+            ainfo.append((self.enabler, "in", "v", (0.5, 0)))
+        if self.runflag is not None:
+            ainfo.append((self.runflag, "out", "v", (0.5, self._size()+1)))
+        return ainfo
     
     def reset(self) -> None:
         self.status = False
