@@ -82,7 +82,9 @@ class TestGrouping(unittest.TestCase):
         b4 = jb.builtin.BlockInv()
         l7 = jb.Link(b1["<sum"], b4[">num"])
         
-        runsys = jb.RunSystem([b1, b2, b3, b4])
+        runsys = jb.RunSystem()
+        for b in [b1, b2, b3, b4]:
+            runsys.add_block(b)
         runsys.run_loop()
         
         self.assertAlmostEqual(b3['<result'].value, 5.3571, 4)

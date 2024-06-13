@@ -1,0 +1,18 @@
+[metadata]
+version = "0.1.5"
+[metadata.counter]
+    block = 2
+    link = 2
+
+[blocks]
+[blocks.b1]
+name = "jabuti.builtin.config.Config"
+params = {values={x=10, y=32}}
+
+[blocks.b2]
+name = "jabuti.builtin.math.Abs"
+
+[blocks.b3]
+name = "custom.sub.math.CrazySum2"
+
+[links]

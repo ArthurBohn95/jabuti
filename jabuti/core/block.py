@@ -6,8 +6,12 @@ from jabuti.core.anchor import Anchor, Input, Output
 
 
 class Block:
-    def __init__(self, function: Callable = None, inputs: list[Input] = None, outputs: list[Output] = None) -> None:
-        # self.name: str = name
+    def __init__(self,
+            function: Callable = None,
+            inputs: list[Input] = None,
+            outputs: list[Output] = None,
+        ) -> None:
+        self.name: str = self.__class__.__name__
         self.status: bool = False
         self.result: any = None
         self.function: Callable = function
@@ -26,22 +30,31 @@ class Block:
         self.runflag: Output = Output("runflag", bool, False, "flag")
     
     def __repr__(self) -> str:
-        return f"[block] function:{self.function.__name__} status:{self.status} enabled:{self.enabler.value}"
+        info = [
+            f"[block::{self.name}",
+            f"enabled:{self.enabler.value}" if self.enabler is not None else None,
+            f"status:{self.status}" if self.status is not None else None,
+        ]
+        return ' '.join([i for i in info if i is not None]) + ']'
+        # f"[block::{self.name}] function:{self.function.__name__} status:{self.status} enabled:{self.enabler.value}"
     
     def __getitem__(self, item: str) -> Input | Output:
         if len(item) < 2:
             return
         
         io, name = item[0], item[1:]
-        if io == '>':
-            return self.inputs.get(name, None)
-        if io == '<':
-            return self.outputs.get(name, None)
+        if io == '>': return self.inputs.get(name, None)
+        if io == '<': return self.outputs.get(name, None)
         
         print(f"Anchor {name} does not exist")
     
     def _size(self) -> int:
         return max(len(self.inputs), len(self.outputs))
+    
+    def _export(self) -> dict[str, any]:
+        return {
+            "name": f"{self.__module__}.{self.name}"
+        }
     
     def _export_anchors(self) -> list[tuple[Anchor, str, str, tuple]]:
         ainfo = []
@@ -58,14 +71,15 @@ class Block:
     def reset(self) -> None:
         self.status = False
         self.result = None
-        for _in in self.inputs.values():
-            _in.reset()
-        for _out in self.outputs.values():
-            _out.reset()
+        for input in self.inputs.values():
+            input.reset()
+        for output in self.outputs.values():
+            output.reset()
         self.runflag.reset()
     
     def is_ready(self) -> bool:
-        return self.check_inputs() and self.enabler
+        self.enabler.check()
+        return self.check_inputs() and self.enabler.value
     
     def register_inputs(self, inputs: list[Input]) -> None:
         for input in inputs:
@@ -78,6 +92,8 @@ class Block:
             self.outputs[output.name] = output
     
     def check_inputs(self) -> None:
+        if not self.inputs: # ConfigBlock
+            return True
         for input in self.inputs.values():
             input.check()
             if not input.status:
@@ -110,7 +126,7 @@ class Block:
                 # print(f"matched!")
             return
         
-        # The result is ordered: a tuple matching the outputs order # HELL NO
+        # The result is ordered: a tuple matching the outputs order
         if isinstance(self.result, (tuple)):
             for value, output in zip(self.result, self.outputs.values()):
                 output.set(value)
@@ -119,12 +135,14 @@ class Block:
         print(f"For some reason could not map the result to the outputs.")
     
     def run(self) -> None:
+        self.reset()
         self.enabler.check()
         if not self.enabler.value:
             # print(f"The block '{self.name}' is disabled")
             return
         
         if self.function is None:
+            # print(f"There is no function")
             return
         
         if not self.check_inputs():
@@ -137,23 +155,45 @@ class Block:
         self.check_outputs()
         self.runflag.set(True)
 
+
 class BlockConfig(Block):
     """Special block that only has outputs"""
     def __init__(self, values: dict[str, any]) -> None:
         super().__init__()
+        self.result = values
         for k, v in values.items():
-            _output = Output(k, type(v))
-            _output.set(v)
-            self.outputs[k] = _output
+            output = Output(k, type(v))
+            output.set(v)
+            self.outputs[k] = output
         self.status: bool = True
+        self.enabler = None
+        self.runflag = None
     
     def __repr__(self) -> str:
-        vals = ', '.join(self.outputs.keys())
-        return f"[block] status:{self.status} enabled:{self.enabler.value} values:{vals}"
+        vals = ','.join(self.outputs.keys())
+        return super().__repr__().replace(']', '') + f" values:{vals}]"
+    
+    def _export(self) -> dict[str, any]:
+        exp = super()._export()
+        exp.update({"params": {"values": self.result}})
+        return exp
+    
+    def reset(self) -> None:
+        pass
+    
+    def run(self) -> None:
+        self.status = True
+        self.check_outputs()
+        self.runflag.set(True)
+
 
 class AutoBlock(Block):
     """Uses the inspect.signature to fill out necessary parameters."""
-    def __init__(self, function: Callable, outputs: dict[str, type] | list[str] = None, flag: bool = False) -> None:
+    def __init__(self,
+            function: Callable,
+            outputs: dict[str, type] | list[str] = None,
+            flag: bool = False,
+        ) -> None:
         super().__init__(function)
         
         for param in inspect.signature(function).parameters.values():

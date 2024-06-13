@@ -1,7 +1,6 @@
 from typing import Any, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     from jabuti.core.link import Link
-# from jabuti.core.const import TYPES_GROUP
 
 
 
@@ -34,6 +33,7 @@ class Anchor:
             return
         self.links.remove(link)
 
+
 class Input(Anchor):
     def check(self):
         if not self.links:
@@ -61,6 +61,7 @@ class Input(Anchor):
                 self.value = all(self.value)
         
         self.status = True
+
 
 class Output(Anchor):
     def set(self, value: Any) -> None:

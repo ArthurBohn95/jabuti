@@ -7,6 +7,10 @@ from jabuti.builtin.bool import (
 from jabuti.builtin.sample import (
     BlockSum, BlockAdd, BlockDiv, BlockInv
 )
+from jabuti.builtin.config import (
+    Config
+)
+
 # from jabuti.builtin.tables import (
 #     BlockUnion
 # )

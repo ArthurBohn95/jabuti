@@ -534,6 +534,7 @@ class Board:
         y0 = int(event.y/GAP)
         blocks = [jb.builtin.Abs, jb.builtin.Sum, jb.builtin.Div, jb.builtin.Cmp]
         block = random.choice(blocks)
+        # block = jb.builtin.Config({"x": 10, "y": 32})
         self.parse_block(block(), (x0, y0))
     
     def on_create_link(self, event: tk.Event) -> None:

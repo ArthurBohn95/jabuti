@@ -25,7 +25,7 @@ class Link:
             # print(f"Link is bad: {bvt} -> {nvt}")
     
     def __repr__(self) -> str:
-        return f"<link> conn:{self.backref.name}-->{self.nextref.name}"
+        return f"<link::Link {self.backref.name}-->{self.nextref.name}>"
     
     def get_value(self) -> any:
         return self.backref.value

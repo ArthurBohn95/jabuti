@@ -1,0 +1,27 @@
+{
+    "metadata": {
+        "version": "0.1.5",
+        "counter": {       
+            "block": 2,    
+            "link": 2      
+        }
+    },
+    "blocks": {
+        "b1": {
+            "name": "jabuti.builtin.config.Config",
+            "params": {
+                "values": {
+                    "x": 10,
+                    "y": 32
+                }
+            }
+        },
+        "b2": {
+            "name": "jabuti.builtin.math.Abs"
+        },
+        "b3": {
+            "name": "custom.sub.math.CrazySum2"
+        }
+    },
+    "links": {}
+}
