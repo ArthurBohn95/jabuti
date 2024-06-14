@@ -25,13 +25,13 @@ class Link:
             # print(f"Link is bad: {bvt} -> {nvt}")
     
     def __repr__(self) -> str:
-        a0 = f"{self.backref.block.name}.<{self.backref.name}"
-        a1 = f"{self.nextref.block.name}.>{self.nextref.name}"
+        a0 = f"{self.backref.block.name}.{self.backref.name}"
+        a1 = f"{self.nextref.block.name}.{self.nextref.name}"
         return f"<link::Link {a0}-->{a1}>"
     
     def _export(self) -> str:
-        a0 = f"{self.backref.block.idf}.<{self.backref.name}"
-        a1 = f"{self.nextref.block.idf}.>{self.nextref.name}"
+        a0 = f"{self.backref.block.idf}<{self.backref.name}"
+        a1 = f"{self.nextref.block.idf}>{self.nextref.name}"
         return f"{a0}-{a1}"
     
     def get_value(self) -> any:

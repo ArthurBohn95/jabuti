@@ -26,10 +26,10 @@ class RunSystem:
             maxb = 0
             for block_key, block_data in blocks.items():
                 maxb = max(maxb, int(block_key.removeprefix('b')))
-                block_name = block_data.get("name")
+                block_class = block_data.get("class")
                 args = block_data.get("args", [])
                 params = block_data.get("params", {})
-                self._build_block(block_name, block_key, *args, **params)
+                self._build_block(block_class, block_key, *args, **params)
             self.counts["block"] = maxb
         
         if links is not None:
@@ -40,7 +40,7 @@ class RunSystem:
             self.counts["link"] = maxl
     
     @staticmethod
-    def from_config(config_path: str) -> "RunSystem":
+    def from_file(config_path: str) -> "RunSystem":
         import json
         
         conf: dict[str, dict[str, dict]]
@@ -70,14 +70,43 @@ class RunSystem:
         
         return rs
     
-    def _build_block(self, block_name: str, block_key: str = None, *args, **params) -> None:
-        if block_name not in self.block_maps:
-            raise Exception(f"Block '{block_name}' not found")
+    def __getitem__(self, item: str) -> Link | Block | Anchor:
+        if len(item) < 2:
+            return
+        
+        tag = item[0].lower()
+        if tag == 'l':
+            return self.links.get(item, None)                  # LINK
+        
+        if tag == 'b':
+            if item in self.blocks:
+                return self.blocks[item]                       # BLOCK
+            
+            if   '>' in item: idx = item.index('>')
+            elif '<' in item: idx = item.index('<')
+            else            : return None
+            
+            bk, ak = item[:idx], item[idx:]
+            if bk not in self.blocks:
+                return None
+            
+            block = self.blocks.get(bk)
+            anchor = block[ak]
+            return anchor                                      # ANCHOR
+    
+    def _build_block(self,
+            block_class: str,
+            block_key: str = None,
+            *args,
+            **params,
+        ) -> None:
+        if block_class not in self.block_maps:
+            raise Exception(f"Block '{block_class}' not found")
         
         if block_key is None:
             block_key = f"b{self.__get_count('block', True)}"
         
-        const = self.block_maps.get(block_name)["class"]
+        const = self.block_maps.get(block_class)["class"]
         block: Block = const(*args, **params)
         block.idf = block_key
         self.blocks[block_key] = block
@@ -86,15 +115,15 @@ class RunSystem:
         if link_key is None:
             link_key = f"l{self.__get_count('link', True)}"
         
-        ba0, ba1 = link_data.split('-')
-        bk0, an0 = ba0.split('.')
-        bk1, an1 = ba1.split('.')
+        ak0, ak1 = link_data.split('-')
+        a0: Anchor = self[ak0]
+        a1: Anchor = self[ak1]
         
-        if bk0 not in self.blocks or bk1 not in self.blocks:
-            print(f"{bk0=} or {bk1=} does not exist")
+        if a0 is None or a1 is None:
+            print(f"{ak0=} or {ak1=} does not exist")
             return
         
-        link = self.blocks[bk0][an0].link_with(self.blocks[bk1][an1])
+        link = Link(a0, a1)
         self.links[link_key] = link
     
     def _export(self) -> dict[str]:

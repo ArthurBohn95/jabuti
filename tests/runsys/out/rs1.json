@@ -4,7 +4,7 @@
   },
   "blocks": {
     "b1": {
-      "name": "jabuti.builtin.config.Config",
+      "class": "jabuti.builtin.config.Config",
       "params": {
         "values": {
           "x": 10,
@@ -13,10 +13,10 @@
       }
     },
     "b2": {
-      "name": "jabuti.builtin.math.Abs"
+      "class": "jabuti.builtin.math.Abs"
     },
     "b3": {
-      "name": "custom.sub.math.CrazySum2"
+      "class": "custom.sub.math.CrazySum2"
     }
   },
   "links": {

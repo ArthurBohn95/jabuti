@@ -1,13 +1,13 @@
+import typing
 import inspect
-from typing import Callable
-
+from jabuti.core.link import Link
 from jabuti.core.anchor import Anchor, Input, Output
 
 
 
 class Block:
     def __init__(self,
-            function: Callable = None,
+            function: typing.Callable = None,
             inputs: list[Input] = None,
             outputs: list[Output] = None,
         ) -> None:
@@ -15,7 +15,7 @@ class Block:
         self.name: str = self.__class__.__name__
         self.status: bool = False
         self.result: any = None
-        self.function: Callable = function
+        self.function: typing.Callable = function
         
         self.inputs: dict[str, Input] = {}
         self.outputs: dict[str, Output] = {}
@@ -32,7 +32,7 @@ class Block:
     
     def __repr__(self) -> str:
         info = [
-            f"[block::{self.name}",
+            f"[block::{self.name}${self.idf}",
             f"enabled:{self.enabler.value}" if self.enabler is not None else None,
             f"status:{self.status}" if self.status is not None else None,
         ]
@@ -42,18 +42,37 @@ class Block:
         if len(item) < 2:
             return
         
-        io, name = item[0], item[1:]
-        if io == '>': return self.inputs.get(name, None)
-        if io == '<': return self.outputs.get(name, None)
-        
-        print(f"Anchor {name} does not exist")
+        tag, name = item[0], item[1:]
+        match tag:
+            case '>':
+                return self.inputs.get(name, None)
+            case '<':
+                return self.outputs.get(name, None)
+            case _:
+                print(f"Anchor {name} does not exist")
+    
+    @property
+    def anchors(self) -> list["Anchor"]:
+        anchors: list["Anchor"] = []
+        if self.inputs  is not None: anchors.extend(self.inputs.values())
+        if self.outputs is not None: anchors.extend(self.outputs.values())
+        if self.enabler is not None: anchors.append(self.enabler)
+        if self.runflag is not None: anchors.append(self.runflag)
+        return anchors
+    
+    @property
+    def links(self) -> list["Link"]:
+        links: list["Link"] = []
+        for anchor in self.anchors:
+            links.extend(anchor.links)
+        return links
     
     def _size(self) -> int:
         return max(len(self.inputs), len(self.outputs))
     
     def _export(self) -> dict[str, any]:
         return {
-            "name": f"{self.__module__}.{self.name}"
+            "class": f"{self.__module__}.{self.name}"
         }
     
     def _export_anchors(self) -> list[tuple[Anchor, str, str, tuple]]:
@@ -78,17 +97,21 @@ class Block:
         self.runflag.reset()
     
     def is_ready(self) -> bool:
+        if self.enabler is None:
+            return True
         self.enabler.check()
         return self.check_inputs() and self.enabler.value
     
     def register_inputs(self, inputs: list[Input]) -> None:
         for input in inputs:
             # print(f"Block '{self.name}' registered Input '{_input.name}'")
+            input.block = self
             self.inputs[input.name] = input
     
     def register_outputs(self, outputs: list[Output]) -> None:
         for output in outputs:
             # print(f"Block '{self.name}' registered Output '{_output.name}'")
+            output.block = self
             self.outputs[output.name] = output
     
     def check_inputs(self) -> None:
@@ -184,13 +207,12 @@ class BlockConfig(Block):
     def run(self) -> None:
         self.status = True
         self.check_outputs()
-        self.runflag.set(True)
 
 
 class AutoBlock(Block):
     """Uses the inspect.signature to fill out necessary parameters."""
     def __init__(self,
-            function: Callable,
+            function: typing.Callable,
             outputs: dict[str, type] | list[str] = None,
             flag: bool = False,
         ) -> None:
