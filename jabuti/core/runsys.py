@@ -1,13 +1,14 @@
 import typing
 from jabuti.core.link import Link
 from jabuti.core.block import Block
+from jabuti.core.anchor import Anchor
 
 
 
 class RunSystem:
     def __init__(self) -> None:
-        self.links: dict[int, Link] = {}
-        self.blocks: dict[int, Block] = {}
+        self.links: dict[str, Link] = {}
+        self.blocks: dict[str, Block] = {}
         self.counts: dict[str, int] = {"block": 0, "link": 0}
         
         self.block_maps: dict[str, dict[str, str | typing.Type]] = {}
@@ -17,19 +18,26 @@ class RunSystem:
         self.awaiting: dict[int, Block] = {}
     
     def setup(self,
-            counts: dict[str, int] = None,
             blocks: dict[str, dict[str, str]] = None,
+            links: dict[str, dict[str, str]] = None,
         ) -> None:
         
-        if counts is not None:
-            self.counts = counts
-        
         if blocks is not None:
+            maxb = 0
             for block_key, block_data in blocks.items():
+                maxb = max(maxb, int(block_key.removeprefix('b')))
                 block_name = block_data.get("name")
                 args = block_data.get("args", [])
                 params = block_data.get("params", {})
                 self._build_block(block_name, block_key, *args, **params)
+            self.counts["block"] = maxb
+        
+        if links is not None:
+            maxl = 0
+            for link_key, link_data in links.items():
+                maxl = max(maxl, int(link_key.removeprefix('l')))
+                self._build_link(link_data, link_key)
+            self.counts["link"] = maxl
     
     @staticmethod
     def from_config(config_path: str) -> "RunSystem":
@@ -52,12 +60,12 @@ class RunSystem:
             case _:
                 print(f"Unsuported extension: '{ext}'")
                 return None
-        print(f"{conf         = }")
+        print(f"conf {ext}     = {conf}")
         
         rs = RunSystem()
         rs.setup(
-            counts=conf["metadata"]["counter"],
             blocks=conf["blocks"],
+            links=conf["links"],
         )
         
         return rs
@@ -69,14 +77,31 @@ class RunSystem:
         if block_key is None:
             block_key = f"b{self.__get_count('block', True)}"
         
-        cls = self.block_maps.get(block_name)
-        self.blocks[block_key] = cls["class"](*args, **params)
+        const = self.block_maps.get(block_name)["class"]
+        block: Block = const(*args, **params)
+        block.idf = block_key
+        self.blocks[block_key] = block
+    
+    def _build_link(self, link_data: str, link_key: str = None) -> None:
+        if link_key is None:
+            link_key = f"l{self.__get_count('link', True)}"
+        
+        ba0, ba1 = link_data.split('-')
+        bk0, an0 = ba0.split('.')
+        bk1, an1 = ba1.split('.')
+        
+        if bk0 not in self.blocks or bk1 not in self.blocks:
+            print(f"{bk0=} or {bk1=} does not exist")
+            return
+        
+        link = self.blocks[bk0][an0].link_with(self.blocks[bk1][an1])
+        self.links[link_key] = link
     
     def _export(self) -> dict[str]:
         data = {
             "metadata": {
                 "version": "0.1.5",
-                "counter": self.counts,
+                # "counter": self.counts,
             },
             "blocks": {},
             "links": {},
@@ -86,6 +111,9 @@ class RunSystem:
             exp = block_obj._export()
             data["blocks"][block_key] = exp
         
+        for link_key, link_obj in self.links.items():
+            data["links"][link_key] = link_obj._export()
+        
         return data
     
     def __get_count(self, key: str, inc: bool = False) -> int:
@@ -94,6 +122,8 @@ class RunSystem:
             count += 1
         self.counts[key] = count
         return count
+    
+    
     
     def _get_elements(self) -> dict[str, dict[str]]:
         return {

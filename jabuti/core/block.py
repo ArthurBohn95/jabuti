@@ -11,6 +11,7 @@ class Block:
             inputs: list[Input] = None,
             outputs: list[Output] = None,
         ) -> None:
+        self.idf: str = None
         self.name: str = self.__class__.__name__
         self.status: bool = False
         self.result: any = None
@@ -26,8 +27,8 @@ class Block:
             self.register_outputs(outputs)
         
         # Creates the specific flow controlling IOs
-        self.enabler: Input = Input("enabler", bool, True, "flag")
-        self.runflag: Output = Output("runflag", bool, False, "flag")
+        self.enabler: Input = Input(self, "enabler", bool, True, "flag")
+        self.runflag: Output = Output(self, "runflag", bool, False, "flag")
     
     def __repr__(self) -> str:
         info = [
@@ -36,7 +37,6 @@ class Block:
             f"status:{self.status}" if self.status is not None else None,
         ]
         return ' '.join([i for i in info if i is not None]) + ']'
-        # f"[block::{self.name}] function:{self.function.__name__} status:{self.status} enabled:{self.enabler.value}"
     
     def __getitem__(self, item: str) -> Input | Output:
         if len(item) < 2:
@@ -162,7 +162,7 @@ class BlockConfig(Block):
         super().__init__()
         self.result = values
         for k, v in values.items():
-            output = Output(k, type(v))
+            output = Output(self, k, type(v))
             output.set(v)
             self.outputs[k] = output
         self.status: bool = True
@@ -206,12 +206,12 @@ class AutoBlock(Block):
                     _type = dict
                 else:
                     _type = any
-            self.inputs[name] = Input(name, _type)
+            self.inputs[name] = Input(self, name, _type)
         
         if outputs is not None:
             if flag:
                 for name in outputs:
-                    self.outputs[name] = Output(name, bool, False, "flag")
+                    self.outputs[name] = Output(self, name, bool, False, "flag")
             else:
                 for name, _type in outputs.items():
-                    self.outputs[name] = Output(name, _type, vtype="value")
+                    self.outputs[name] = Output(self, name, _type, vtype="value")

@@ -5,15 +5,15 @@ import jabuti as jb
 
 class TestConnection(unittest.TestCase):
     def test_minimal(self):
-        o1 = jb.Output("o1", int, 42)
-        i1 = jb.Input("i1", int)
+        o1 = jb.Output(None, "o1", int, 42)
+        i1 = jb.Input(None, "i1", int)
         l1 = jb.Link(o1, i1)
         
         self.assertEqual(i1.value, 42)
     
     def test_autolink(self):
-        o1 = jb.Output("o1", int, 42)
-        i1 = jb.Input("i1", int)
+        o1 = jb.Output(None, "o1", int, 42)
+        i1 = jb.Input(None, "i1", int)
         l1 = o1.link_with(i1)
         
         self.assertEqual(i1.value, 42)
@@ -21,9 +21,9 @@ class TestConnection(unittest.TestCase):
 
 class TestBuiltins(unittest.TestCase):
     def test_sum(self):
-        o1 = jb.Output("o1", int, 10)
-        o2 = jb.Output("o2", float, 32.1)
-        o3 = jb.Output("o3", float, -0.1)
+        o1 = jb.Output(None, "o1", int, 10)
+        o2 = jb.Output(None, "o2", float, 32.1)
+        o3 = jb.Output(None, "o3", float, -0.1)
         b1 = jb.builtin.BlockSum()
         l1 = jb.Link(o1, b1[">nums"])
         l2 = jb.Link(o2, b1[">nums"])

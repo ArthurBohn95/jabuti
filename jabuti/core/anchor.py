@@ -1,15 +1,23 @@
 from typing import Any, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     from jabuti.core.link import Link
+    from jabuti.core.block import Block
 
 
 
 class Anchor:
-    def __init__(self, name: str, _type: type, value: Any = None, vtype: Literal["value", "flag"] = "value") -> None:
+    def __init__(self,
+            block: "Block",
+            name: str,
+            _type: type,
+            value: Any = None,
+            vtype: Literal["value", "flag"] = "value",
+        ) -> None:
         self.name: str = name
         self.type: type = _type
         self.vtype: str = vtype
         self.value: Any = value
+        self.block: "Block" = block
         self.links: list["Link"] = []
         self.status: bool = False
         
@@ -17,7 +25,12 @@ class Anchor:
             self.status = True
     
     def __repr__(self) -> str:
-        return f"(anchor) name:{self.name} type:{self.vtype}({self.type.__name__}) value:{self.value} status:{self.status} links:{self.links}"
+        _type = f"type:{self.vtype}({self.type.__name__})"
+        _vals = f"value:{self.value} status:{self.status} links:{self.links}"
+        return f"(anchor) name:{self.name} {_type} {_vals}"
+    
+    def rmv(self) -> None:
+        self.block = None
     
     def reset(self) -> None:
         self.value = None
