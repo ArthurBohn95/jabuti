@@ -26,7 +26,7 @@ class Anchor:
     
     def __repr__(self) -> str:
         _type = f"type:{self.vtype}({self.type.__name__})"
-        _vals = f"value:{self.value} status:{self.status} links:{self.links}"
+        _vals = f"value:{self.value} status:{self.status} links:{len(self.links)}"
         return f"(anchor) name:{self.name} {_type} {_vals}"
     
     def rmv(self) -> None:
